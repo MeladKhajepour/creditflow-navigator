@@ -127,10 +127,27 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         return prev;
       }
       const question = interviewQuestions[next];
-      setMessages((msgs) => [
-        ...msgs,
-        { ...question, timestamp: new Date().toISOString(), id: `q-live-${next}` },
-      ]);
+
+      // For the first question, adjust the message based on whether services are connected
+      if (next === 0) {
+        setApplication((currentApp) => {
+          const hasConnected = (currentApp.connectedServices || []).length > 0;
+          const contextualContent = hasConnected
+            ? "Great, your financial data is being pulled in! Now let's talk about the qualitative side. Can you describe in your own words why you're seeking this loan and what it will enable for your business?"
+            : "No problem — you can always connect financial services later. For now, let's gather some qualitative information about your business. Can you describe in your own words why you're seeking this loan and what it will enable for your business?";
+          setMessages((msgs) => [
+            ...msgs,
+            { ...question, content: contextualContent, timestamp: new Date().toISOString(), id: `q-live-${next}` },
+          ]);
+          return currentApp;
+        });
+      } else {
+        setMessages((msgs) => [
+          ...msgs,
+          { ...question, timestamp: new Date().toISOString(), id: `q-live-${next}` },
+        ]);
+      }
+
       return next;
     });
   }, []);
