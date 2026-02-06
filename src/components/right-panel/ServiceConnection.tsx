@@ -6,7 +6,7 @@ import { Check, Link2, Loader2, SkipForward, ArrowRight } from "lucide-react";
 import type { ServiceProvider } from "@/types";
 
 export default function ServiceConnection() {
-  const { services, connectService, setRightPanelStage, advanceQuestion, currentQuestionIndex } = useAppState();
+  const { services, connectService, setRightPanelStage, advanceQuestion, currentQuestionIndex, addMessage } = useAppState();
   const [connecting, setConnecting] = useState<ServiceProvider | null>(null);
 
   const handleConnect = async (provider: ServiceProvider) => {
@@ -15,6 +15,16 @@ export default function ServiceConnection() {
     await new Promise((r) => setTimeout(r, 1800));
     connectService(provider);
     setConnecting(null);
+
+    // Notify in chat that data was pulled
+    const label = provider.charAt(0).toUpperCase() + provider.slice(1);
+    addMessage({
+      id: `ai-connected-${provider}-${Date.now()}`,
+      role: "ai",
+      content: `${label} connected successfully! I'm pulling your financial data now — you'll see it populate on the right panel with verified badges.`,
+      type: "text",
+      timestamp: new Date().toISOString(),
+    });
   };
 
   const handleContinue = () => {
@@ -37,7 +47,7 @@ export default function ServiceConnection() {
           <h2 className="text-xl font-semibold tracking-tight">Connect Your Financial Services</h2>
           <p className="text-sm text-muted-foreground leading-relaxed max-w-md mx-auto">
             Link your accounting and payment platforms so we can pull verified financial data.
-            This strengthens your application and speeds up the assessment.
+            This replaces manual data entry and strengthens your application.
           </p>
         </div>
 
@@ -138,7 +148,7 @@ export default function ServiceConnection() {
 
         {connectedCount > 0 && (
           <p className="text-center text-xs text-verified">
-            {connectedCount} service{connectedCount > 1 ? "s" : ""} connected — verified data will be highlighted in your application
+            {connectedCount} service{connectedCount > 1 ? "s" : ""} connected — financial data will be auto-populated with verification badges
           </p>
         )}
       </div>

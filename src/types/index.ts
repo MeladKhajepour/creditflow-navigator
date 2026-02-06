@@ -20,7 +20,7 @@ export interface ConnectedService {
 
 // --- Loan Application ---
 
-export type VerificationSource = "xero" | "quickbooks" | "stripe" | "self-reported";
+export type VerificationSource = "xero" | "quickbooks" | "stripe" | "self-reported" | "onboarding";
 
 export interface VerifiedField<T = string | number> {
   value: T;
@@ -50,11 +50,23 @@ export interface LoanRequest {
   interestType: VerifiedField<"fixed" | "variable">;
 }
 
+export interface QualitativeInsights {
+  loanPurpose: string;
+  growthStrategy: string;
+  competitiveAdvantage: string;
+  useOfFunds: string;
+  repaymentPlan: string;
+  marketConditions: string;
+  teamExperience: string;
+  challengesAndRisks: string;
+}
+
 export interface LoanApplication {
   id: string;
   company: CompanyInfo;
   financials: FinancialSnapshot;
   loan: LoanRequest;
+  qualitative: Partial<QualitativeInsights>;
   connectedServices: ServiceProvider[];
   completionPercent: number;
   submittedAt?: string;
@@ -67,10 +79,10 @@ export type RiskLevel = "low" | "medium" | "high" | "critical";
 export type Decision = "approved" | "denied" | "conditional";
 
 export interface RiskMetrics {
-  probabilityOfDefault: number;   // 0-1
-  exposureAtDefault: number;      // dollar amount
-  lossGivenDefault: number;       // 0-1
-  expectedLoss: number;           // dollar amount
+  probabilityOfDefault: number;
+  exposureAtDefault: number;
+  lossGivenDefault: number;
+  expectedLoss: number;
 }
 
 export interface RiskFactor {
@@ -98,10 +110,10 @@ export interface DataSourceSummary {
 export interface AssessmentResult {
   id: string;
   applicationId: string;
-  riskScore: number;              // 0-100
+  riskScore: number;
   riskLevel: RiskLevel;
   decision: Decision;
-  recommendedRate: number;        // percentage
+  recommendedRate: number;
   metrics: RiskMetrics;
   explanation: string;
   riskFactors: RiskFactor[];
@@ -127,7 +139,7 @@ export interface ChatMessage {
   type: MessageType;
   timestamp: string;
   options?: QuickReplyOption[];
-  fieldMapping?: string;          // which form field this maps to
+  qualitativeField?: keyof QualitativeInsights;
 }
 
 // --- Right Panel State ---

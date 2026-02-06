@@ -9,7 +9,7 @@ interface ChatBubbleProps {
 }
 
 export default function ChatBubble({ message }: ChatBubbleProps) {
-  const { addMessage, advanceQuestion, setRightPanelStage, setIsAssessing, setAssessment } = useAppState();
+  const { addMessage, setRightPanelStage, setIsAssessing, setAssessment } = useAppState();
   const isAI = message.role === "ai";
 
   const handleQuickReply = (value: string, label: string) => {
@@ -24,7 +24,13 @@ export default function ChatBubble({ message }: ChatBubbleProps) {
     if (value === "submit") {
       setRightPanelStage("assessment-results");
       setIsAssessing(true);
-      // Simulate assessment
+      addMessage({
+        id: `ai-processing-${Date.now()}`,
+        role: "ai",
+        content: "Submitting your application now. Our AI agents are analyzing your verified financial data alongside your interview responses...",
+        type: "text",
+        timestamp: new Date().toISOString(),
+      });
       import("@/services/api").then(({ getAssessment }) => {
         getAssessment("APP-mock").then((result) => {
           setAssessment(result);
@@ -32,7 +38,7 @@ export default function ChatBubble({ message }: ChatBubbleProps) {
           addMessage({
             id: `ai-result-${Date.now()}`,
             role: "ai",
-            content: "Your assessment is complete! You can view the detailed results on the right panel. Feel free to ask me any questions about the findings.",
+            content: "Your assessment is complete! Review the detailed results on the right panel. Feel free to ask me any questions about the findings, risk factors, or recommendations.",
             type: "text",
             timestamp: new Date().toISOString(),
           });
@@ -42,29 +48,11 @@ export default function ChatBubble({ message }: ChatBubbleProps) {
       addMessage({
         id: `ai-review-${Date.now()}`,
         role: "ai",
-        content: "You can review and edit your application on the right panel. Let me know when you're ready to submit.",
+        content: "Take your time reviewing the application summary on the right panel. You can see all your verified financial data and qualitative responses. Let me know when you're ready to submit.",
         type: "text",
         timestamp: new Date().toISOString(),
       });
     }
-  };
-
-  const handleSelectOption = (value: string, label: string) => {
-    addMessage({
-      id: `user-${Date.now()}`,
-      role: "user",
-      content: label,
-      type: "text",
-      timestamp: new Date().toISOString(),
-    });
-
-    if (message.fieldMapping) {
-      import("@/context/AppContext").then(() => {
-        // Field update handled in ChatInput
-      });
-    }
-
-    setTimeout(() => advanceQuestion(), 600);
   };
 
   return (
@@ -109,23 +97,6 @@ export default function ChatBubble({ message }: ChatBubbleProps) {
                 size="sm"
                 className="text-xs h-7 border-primary/30 text-primary hover:bg-primary/10"
                 onClick={() => handleQuickReply(opt.value, opt.label)}
-              >
-                {opt.label}
-              </Button>
-            ))}
-          </div>
-        )}
-
-        {/* Select Options */}
-        {message.type === "select" && message.options && (
-          <div className="flex flex-wrap gap-1.5 mt-1.5">
-            {message.options.map((opt) => (
-              <Button
-                key={opt.value}
-                variant="outline"
-                size="sm"
-                className="text-xs h-7 border-border/50 text-foreground hover:bg-accent"
-                onClick={() => handleSelectOption(opt.value, opt.label)}
               >
                 {opt.label}
               </Button>

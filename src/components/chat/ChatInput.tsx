@@ -15,7 +15,7 @@ export default function ChatInput({ setShowTyping }: ChatInputProps) {
     advanceQuestion,
     currentQuestionIndex,
     interviewComplete,
-    updateApplicationField,
+    updateQualitativeField,
     rightPanelStage,
   } = useAppState();
 
@@ -33,14 +33,11 @@ export default function ChatInput({ setShowTyping }: ChatInputProps) {
 
     addMessage(userMessage);
 
-    // Map the answer to the appropriate form field
+    // Map the answer to the appropriate qualitative field
     if (currentQuestionIndex >= 0) {
       const currentQ = interviewQuestions[currentQuestionIndex];
-      if (currentQ?.fieldMapping) {
-        updateApplicationField(currentQ.fieldMapping, {
-          value: isNaN(Number(input)) ? input.trim() : Number(input),
-          source: "self-reported",
-        });
+      if (currentQ?.qualitativeField) {
+        updateQualitativeField(currentQ.qualitativeField, input.trim());
       }
     }
 
@@ -54,7 +51,7 @@ export default function ChatInput({ setShowTyping }: ChatInputProps) {
     }, 800);
   };
 
-  const isDisabled = interviewComplete && rightPanelStage === "assessment-results";
+  const isPostAssessment = interviewComplete && rightPanelStage === "assessment-results";
 
   return (
     <form
@@ -67,9 +64,9 @@ export default function ChatInput({ setShowTyping }: ChatInputProps) {
           value={input}
           onChange={(e) => setInput(e.target.value)}
           placeholder={
-            isDisabled
-              ? "Assessment complete — ask questions about results"
-              : "Type your response..."
+            isPostAssessment
+              ? "Ask questions about your assessment results..."
+              : "Share your thoughts..."
           }
           className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground/60"
         />
