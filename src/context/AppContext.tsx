@@ -6,9 +6,17 @@ import type {
   AssessmentResult,
   ChatMessage,
   ServiceProvider,
-  VerifiedField,
+  QualitativeInsights,
 } from "@/types";
-import { mockServices, initialChatMessages, interviewQuestions } from "@/data/mock-data";
+import {
+  mockServices,
+  initialChatMessages,
+  interviewQuestions,
+  onboardingCompanyInfo,
+  onboardingLoanRequest,
+  xeroFinancialData,
+  quickbooksFinancialData,
+} from "@/data/mock-data";
 
 interface AppState {
   // Panel state
@@ -28,8 +36,7 @@ interface AppState {
 
   // Application
   application: Partial<LoanApplication>;
-  updateApplicationField: (path: string, value: VerifiedField) => void;
-  applicationComplete: boolean;
+  updateQualitativeField: (field: keyof QualitativeInsights, value: string) => void;
 
   // Assessment
   assessment: AssessmentResult | null;
@@ -50,9 +57,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [rightPanelStage, setRightPanelStage] = useState<RightPanelStage>("connect-services");
   const [services, setServices] = useState<ConnectedService[]>([...mockServices]);
   const [messages, setMessages] = useState<ChatMessage[]>([...initialChatMessages]);
-  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(-1); // -1 = pre-interview
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(-1);
   const [interviewComplete, setInterviewComplete] = useState(false);
   const [application, setApplication] = useState<Partial<LoanApplication>>({
+    // Pre-filled from onboarding
+    company: onboardingCompanyInfo,
+    loan: onboardingLoanRequest,
+    qualitative: {},
     connectedServices: [],
     completionPercent: 0,
     status: "draft",
@@ -68,10 +79,40 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           : s
       )
     );
-    setApplication((prev) => ({
-      ...prev,
-      connectedServices: [...(prev.connectedServices || []), provider],
-    }));
+
+    // Auto-populate financial data from the connected service
+    setApplication((prev) => {
+      const updated = { ...prev };
+      updated.connectedServices = [...(prev.connectedServices || []), provider];
+
+      if (!updated.financials) {
+        updated.financials = {} as any;
+      }
+
+      if (provider === "xero") {
+        updated.financials = {
+          ...updated.financials!,
+          annualRevenue: xeroFinancialData.annualRevenue,
+          ebitda: xeroFinancialData.ebitda,
+          netIncome: xeroFinancialData.netIncome,
+          cashRunway: xeroFinancialData.cashRunway,
+        };
+      } else if (provider === "quickbooks") {
+        updated.financials = {
+          ...updated.financials!,
+          totalDebt: quickbooksFinancialData.totalDebt,
+          // Only override revenue if not already verified
+          ...(updated.financials?.annualRevenue?.source !== "xero"
+            ? { annualRevenue: quickbooksFinancialData.annualRevenue }
+            : {}),
+        };
+      }
+
+      // Recalculate completion
+      updated.completionPercent = calculateCompletion(updated);
+
+      return updated;
+    });
   }, []);
 
   const addMessage = useCallback((message: ChatMessage) => {
@@ -94,38 +135,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
-  const updateApplicationField = useCallback((path: string, value: VerifiedField) => {
+  const updateQualitativeField = useCallback((field: keyof QualitativeInsights, value: string) => {
     setApplication((prev) => {
-      const updated = { ...prev };
-      const parts = path.split(".");
-      let obj: any = updated;
-      for (let i = 0; i < parts.length - 1; i++) {
-        if (!obj[parts[i]]) obj[parts[i]] = {};
-        obj[parts[i]] = { ...obj[parts[i]] };
-        obj = obj[parts[i]];
-      }
-      obj[parts[parts.length - 1]] = value;
-
-      // Calculate completion
-      const totalFields = 9;
-      let filled = 0;
-      const c = updated as any;
-      if (c.company?.name?.value) filled++;
-      if (c.company?.industry?.value) filled++;
-      if (c.company?.country?.value) filled++;
-      if (c.financials?.annualRevenue?.value) filled++;
-      if (c.financials?.ebitda?.value) filled++;
-      if (c.financials?.totalDebt?.value) filled++;
-      if (c.loan?.amount?.value) filled++;
-      if (c.loan?.termMonths?.value) filled++;
-      if (c.loan?.purpose?.value) filled++;
-      updated.completionPercent = Math.round((filled / totalFields) * 100);
-
+      const updated = {
+        ...prev,
+        qualitative: {
+          ...(prev.qualitative || {}),
+          [field]: value,
+        },
+      };
+      updated.completionPercent = calculateCompletion(updated);
       return updated;
     });
   }, []);
-
-  const applicationComplete = (application.completionPercent ?? 0) >= 100;
 
   return (
     <AppContext.Provider
@@ -140,8 +162,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         advanceQuestion,
         interviewComplete,
         application,
-        updateApplicationField,
-        applicationComplete,
+        updateQualitativeField,
         assessment,
         setAssessment,
         isAssessing,
@@ -151,4 +172,37 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       {children}
     </AppContext.Provider>
   );
+}
+
+function calculateCompletion(app: Partial<LoanApplication>): number {
+  let filled = 0;
+  const total = 14; // company(4) + financials(5) + loan basics(3) + at least 2 qualitative
+
+  // Company (pre-filled from onboarding)
+  const c = app.company as any;
+  if (c?.name?.value) filled++;
+  if (c?.industry?.value) filled++;
+  if (c?.country?.value) filled++;
+  if (c?.yearsInOperation?.value) filled++;
+
+  // Financials (from connected services)
+  const f = app.financials as any;
+  if (f?.annualRevenue?.value) filled++;
+  if (f?.ebitda?.value) filled++;
+  if (f?.totalDebt?.value) filled++;
+  if (f?.cashRunway?.value) filled++;
+  if (f?.netIncome?.value) filled++;
+
+  // Loan basics (from onboarding)
+  const l = app.loan as any;
+  if (l?.amount?.value) filled++;
+  if (l?.termMonths?.value) filled++;
+  if (l?.purpose?.value) filled++;
+
+  // Qualitative (from chat interview)
+  const q = app.qualitative;
+  if (q?.loanPurpose) filled++;
+  if (q?.growthStrategy) filled++;
+
+  return Math.min(100, Math.round((filled / total) * 100));
 }
